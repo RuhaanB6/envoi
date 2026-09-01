@@ -1,0 +1,10 @@
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "B"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's `Depends(...)` / `Query(...)` / etc. in argument defaults is the
+# documented, intended pattern -- don't flag it as a mutable-default bug.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Body"]

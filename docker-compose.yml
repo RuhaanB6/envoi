@@ -1,0 +1,23 @@
+services:
+  postgres:
+    # Pinned to the Postgres 17 major version so local dev matches what
+    # Neon runs later -- do not bump this without checking Neon's supported
+    # version first.
+    image: postgres:17.6
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cs348
+      POSTGRES_PASSWORD: cs348
+      POSTGRES_DB: cs348
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cs348 -d cs348"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
