@@ -65,7 +65,7 @@ uvicorn app.main:app --reload --port 8000
 In another terminal, confirm it's alive:
 
 ```bash
-curl http://localhost:8000/api/health
+e
 ```
 
 You should get back JSON with `status: "ok"`, a real Postgres version
