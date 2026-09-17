@@ -1,8 +1,14 @@
-# CS348 Project -- Stage 1
+# CS348 Project -- a letters app
 
-**Status:** Stage 1 scaffold only. Proves the stack is installed and wired
-together end to end (React → FastAPI → psycopg → Postgres). No application
-features yet -- the domain is still undecided.
+**Status:** the domain is decided. This is a letters app: pen-pal
+correspondence between users, where a letter takes time to arrive based on the
+distance between them, plus one-off direct sends via a share link. Stage 1
+proved the stack end to end (React → FastAPI → psycopg → Postgres); the real
+schema and features are Stage 2.
+
+The product, domain, schema and plan live in
+[`docs/project-context.md`](docs/project-context.md) -- that document is the
+source of truth, not this README.
 
 ## Stack
 
@@ -51,9 +57,10 @@ uv pip install -r requirements.txt
 yoyo apply --batch
 ```
 
-`yoyo apply` runs `migrations/001_initial.sql`, which creates a trivial
-`stack_check` table and inserts one row -- just enough to prove migrations
-reach a real database. (To undo it: `yoyo rollback --batch --all`.)
+`yoyo apply` runs every pair in `migrations/` in order. The Stage 1
+placeholder has been rolled back and deleted; the real `001` is `users` and
+`sessions`. (To undo everything: `yoyo rollback --batch --all`.) `yoyo` only
+works from `backend/` -- its `sources` path is relative.
 
 ## 3. Run the backend
 
@@ -65,7 +72,7 @@ uvicorn app.main:app --reload --port 8000
 In another terminal, confirm it's alive:
 
 ```bash
-e
+curl -s http://localhost:8000/api/health
 ```
 
 You should get back JSON with `status: "ok"`, a real Postgres version
@@ -120,23 +127,28 @@ cs348-project/
 │   │   ├── config.py         # pydantic-settings: DATABASE_URL, CORS_ORIGINS
 │   │   ├── db.py             # psycopg ConnectionPool + get_conn dependency
 │   │   └── routers/health.py # GET /api/health
-│   ├── migrations/
-│   │   ├── 001_initial.sql            # forward SQL
-│   │   └── 001_initial.rollback.sql   # matching rollback SQL
+│   ├── migrations/           # yoyo NNN_<name>.sql + NNN_<name>.rollback.sql pairs
 │   ├── tests/test_health.py
 │   ├── yoyo.ini
 │   ├── requirements.txt
 │   ├── Dockerfile
 │   └── .env.example
-├── frontend/                 # Vite + React + TS
+├── frontend/                 # Vite + React + TS + Tailwind
+├── docs/                     # project-context.md, DECISIONS.md, tasks/
 ├── docker-compose.yml        # Postgres 17, named volume, port 5432
+├── AGENTS.md                 # conventions for AI coding agents
 └── README.md
 ```
 
 ## Next steps
 
-- Pick the application domain (Stage 2).
-- Design the real schema, add indexing, stored procedures, transactions,
-  and the two required interfaces (data management + reporting).
-- Point `DATABASE_URL` at a Neon connection string when moving off local
-  Docker Postgres -- no code changes needed, just the `.env` value.
+The ordered plan is in [`docs/project-context.md`](docs/project-context.md)
+("Stage 2 plan"). In short:
+
+- Migration 001: `users` and `sessions`, plus register / login / logout / `me`.
+- Migration 002: `penpalships`, `letters`, `letter_recipients`, `tags`.
+- Requirement 1: compose, edit, delete and send a letter, with the
+  `send_letter` stored procedure and the delivery sweep.
+- Requirement 2: the mailbox summary report, filters populated from the
+  database.
+- Deploy to Neon + Render + Vercel, then the letter-in-transit animations.
