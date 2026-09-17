@@ -1,0 +1,10 @@
+#!/bin/bash
+# Strip AI attribution lines from commit messages. Belt and braces: the
+# `attribution` setting in .claude/settings.json is ignored on some versions.
+set -eu
+
+MSG="$1"
+TMP="$MSG.tmp"
+
+grep -vE '^Co-Authored-By: Claude|Generated with \[Claude Code\]|^Claude-Session:' "$MSG" > "$TMP" || true
+mv "$TMP" "$MSG"

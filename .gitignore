@@ -17,3 +17,7 @@ frontend/dist/
 .DS_Store
 .vscode/
 .idea/
+
+# Claude Code
+.claude/settings.local.json
+docs/HANDOFF.md
