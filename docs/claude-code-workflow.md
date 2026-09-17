@@ -105,7 +105,7 @@ cat docs/HANDOFF.md        # or just ask "what's the handoff say?"
 3. "Use test-runner to run the backend tests and report only failures." Fix. Repeat.
 4. "Use sql-reviewer on the migration and db module for this task." Then "Use diff-reviewer to check the diff against docs/tasks/NNN.md. Report gaps only." Fix real gaps; ignore style noise.
 5. `/verify-app` for the end-to-end check (docker up, migrate, rollback, migrate, pytest, build).
-6. "Commit with a descriptive message." (PR via `gh` if you go with branches.)
+6. Commits happen as you go (AGENTS.md says so); at the end, "commit anything outstanding." If a message comes back long, say "split that into smaller commits" once and it will.
 7. `/handoff`, then `/clear`.
 
 **Small fixes:** skip the plan and the reviewers. "Rename X to Y and run ruff." Done.
@@ -118,7 +118,7 @@ cat docs/HANDOFF.md        # or just ask "what's the handoff say?"
 |---|---|---|---|---|
 | Explore (override) | sonnet | read-only | codebase search so it never runs on Opus | writes |
 | test-runner | sonnet | Bash, Read, Grep, Glob | run pytest / build; return failing tests + errors only | edit files, "fix" things |
-| sql-reviewer | inherit (opus) | Read, Grep, Glob, Bash(read-only psql) | review SQL for correctness, injection, transaction boundaries, indexes, rubric fit | edit files |
+| sql-reviewer | opus (always, regardless of session) | Read, Grep, Glob, Bash(read-only psql) | review SQL for correctness, injection, transaction boundaries, indexes, rubric fit | edit files |
 | diff-reviewer | inherit (opus) | Read, Grep, Glob, Bash(git diff/log) | compare diff to task spec; report gaps affecting correctness or requirements | style opinions, edits |
 
 Rules that apply to all of them:
@@ -139,13 +139,15 @@ Rules that apply to all of them:
 
 `permissions.deny` (native, no script): `Read(./.env*)`, `Read(./backend/.env*)`, `Bash(git push --force*)`, `Bash(rm -rf *)`, `Bash(docker compose down -v*)`.
 
+Commit hygiene is three layers because the first is unreliable: `attribution: {"commit": "", "pr": ""}` in settings, a committed `.githooks/commit-msg` that strips `Co-Authored-By: Claude`, `Generated with [Claude Code]` and `Claude-Session:` lines, and the commit rule in AGENTS.md (≤ 50-char subject, split rather than lengthen, commit as you go).
+
 `permissions.allow`: `Bash(uv *)`, `Bash(backend/.venv/bin/*)`, `Bash(python -m pytest*)`, `Bash(ruff *)`, `Bash(uvicorn *)`, `Bash(npm run *)`, `Bash(npx tsc *)`, `Bash(npx oxlint *)`, `Bash(docker compose up *)`, `Bash(docker compose ps *)`, `Bash(git status*)`, `Bash(git diff*)`, `Bash(git log*)`, `Bash(git add *)`, `Bash(git commit *)`, `Bash(psql *)`, `Bash(yoyo *)`, `Bash(gh pr *)`.
 
 ## 7. Setup prompt for Opus 5
 
 **Pre-flight, before running it (5 minutes, you do this by hand):**
 
-1. Roll back and delete the placeholder migration while it's still cheap: `cd backend && yoyo rollback --batch --all`, then `git rm migrations/001_initial.sql migrations/001_initial.rollback.sql`. It creates a throwaway `stack_check` table; once the immutable-migrations hook exists you'd have to carry it forever. The real schema becomes `001_users_sessions.sql`.
+1. Roll back and delete the placeholder migration while it's still cheap: `cd backend && .venv/bin/yoyo rollback --batch --all` (yoyo lives in the venv, not on your PATH), then `git rm migrations/001_initial.sql migrations/001_initial.rollback.sql`. It creates a throwaway `stack_check` table; once the immutable-migrations hook exists you'd have to carry it forever. The real schema becomes `001_users_sessions.sql`.
 2. Move the health check off `stack_check` if anything referenced it (nothing does today; `health.py` only runs `SELECT version()`).
 3. Copy `docs/project-context.md` into the repo (`mkdir docs`).
 4. Update `README.md`'s status line and "Next steps": the domain is decided. Or let Opus do it; it's told to.
@@ -215,10 +217,16 @@ slash-names, no subagent names, no hooks, no plan mode. Sections, in order:
   backend/tests/** read .claude/rules/tests.md. Before touching letters,
   penpalships or delivery logic read .claude/skills/data-model/SKILL.md.
   Grading criteria: .claude/skills/cs348-rubric/SKILL.md."
-- Process (≤ 4 bullets, tool-neutral): write a spec to docs/tasks/ before
+- Process (≤ 5 bullets, tool-neutral): write a spec to docs/tasks/ before
   multi-file work; run the tests and tsc before declaring anything done;
   append decisions to docs/DECISIONS.md; update docs/HANDOFF.md at the end
   of a session.
+- Commits (exact wording, keep it): "Commit after every coherent change, not
+  at the end of a task. Subject line ≤ 50 characters, imperative, plain
+  English, no scope prefixes or conventional-commit tags. Body only when the
+  subject can't carry it, ≤ 3 lines. If a message would need 'and', make two
+  commits. No AI attribution of any kind: no Co-Authored-By, no 'Generated
+  with', no session links." 
 
 ### 2. CLAUDE.md (repo root, ≤ 20 lines)
 Line 1 is exactly `@AGENTS.md`. Then a "Claude Code" section only:
@@ -266,8 +274,11 @@ Each rule file ≤ 30 lines. Only things Claude can't infer from the code.
   forward + rollback pair using the repo's naming, apply, rollback, apply
   again, run pytest, print the two file paths. Refuse if a tracked migration
   is being edited.
-- verify-app/SKILL.md — disable-model-invocation: true. docker compose up,
-  wait for healthy, yoyo apply, curl /api/health, pytest, ruff, tsc, npm run
+- verify-app/SKILL.md — disable-model-invocation: true. From the repo
+  root: `docker compose up -d`, then poll `docker compose ps` until postgres
+  is healthy (fail after 60s with a clear message if Docker isn't running);
+  cd backend and `.venv/bin/yoyo apply --batch`; start uvicorn in the
+  background and curl /api/health; pytest; ruff; cd frontend and tsc, npm run
   build. Print a pass/fail table and the raw output only for failures.
 - handoff/SKILL.md — disable-model-invocation: true. Overwrite
   docs/HANDOFF.md with: task in progress + spec path, files modified this
@@ -280,10 +291,13 @@ Each rule file ≤ 30 lines. Only things Claude can't infer from the code.
 - test-runner.md — model: sonnet; tools: Bash, Read, Grep, Glob;
   disallowedTools: Agent. Description ≤ 2 sentences. Body: run the command
   it's given (default: cd backend && .venv/bin/python -m pytest -q), return
-  ONLY failing test names,
-  assertion messages and the relevant traceback lines; never edit files;
-  never suggest fixes longer than one line.
-- sql-reviewer.md — model: inherit; tools: Read, Grep, Glob, Bash;
+  ONLY failing test names, assertion messages and the relevant traceback
+  lines. If the failure is a psycopg connection refused on port 5432, return
+  the single line "Postgres not reachable — run `docker compose up -d` from
+  the repo root" and nothing else. Never edit files; never suggest fixes
+  longer than one line.
+- sql-reviewer.md — model: opus (pinned, not inherit — SQL review always
+  runs on Opus even in a Sonnet session); tools: Read, Grep, Glob, Bash;
   skills: [cs348-rubric]; disallowedTools: Agent, Edit, Write. Body: review
   checklist — parameterization, transaction boundaries, FOR UPDATE where
   concurrent writes are possible, index coverage for the query shapes in the
@@ -317,8 +331,17 @@ Each rule file ≤ 30 lines. Only things Claude can't infer from the code.
   uvicorn *, npm run *, npx tsc *, npx oxlint *,
   docker compose up *, docker compose ps *, git status/diff/log/add/commit,
   psql *, yoyo *, gh pr *.
+- attribution: {"commit": "", "pr": ""}.
 - env: CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1.
 Add .claude/settings.local.json and docs/HANDOFF.md to .gitignore.
+
+### 7b. Git hook (belt and braces; the attribution setting is known to be
+### ignored on some versions)
+Create .githooks/commit-msg (executable) that deletes any line matching
+`^Co-Authored-By: Claude`, `Generated with \[Claude Code\]`, or
+`^Claude-Session:` from the message file, then run
+`git config core.hooksPath .githooks` and mention in AGENTS.md's Commands
+section that a fresh clone must run that command once.
 
 ### 8. docs/
 - docs/DECISIONS.md — seed with the stack decisions and the domain decisions
