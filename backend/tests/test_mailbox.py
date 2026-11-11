@@ -298,3 +298,24 @@ def test_invalid_report_filters_are_rejected(client, people, params):
 def test_unknown_or_missing_identity(client):
     assert client.get("/api/report", params={"user_id": 999999}).status_code == 404
     assert client.get("/api/report").status_code == 422
+
+
+def test_invalid_edit_is_atomic(client, db, people, pair):
+    letter = insert_letter(db, people[0], people[1], mode="penpal", penpalship_id=pair)
+    response = client.put(
+        f"/api/letters/{letter}",
+        params={"user_id": people[0]},
+        json=payload(people[2], mode="penpal", penpalship_id=pair, subject="Must not persist"),
+    )
+    assert response.status_code == 422
+    assert db.execute(
+        "SELECT recipient_id,subject FROM letters WHERE id=%s", (letter,)
+    ).fetchone() == (people[1], "Test letter")
+
+
+def test_foreign_keys_preserve_referenced_users_and_pairs(db, people, pair):
+    insert_letter(db, people[0], people[1], mode="penpal", penpalship_id=pair)
+    with pytest.raises(psycopg.errors.ForeignKeyViolation):
+        db.execute("DELETE FROM users WHERE id=%s", (people[0],))
+    with pytest.raises(psycopg.errors.ForeignKeyViolation):
+        db.execute("DELETE FROM penpalships WHERE id=%s", (pair,))

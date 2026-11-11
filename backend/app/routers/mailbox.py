@@ -15,7 +15,8 @@ from app.db import get_conn
 from app.queries import CREATE_LETTER, DELETE_LETTER, MAILBOX_REPORT, UPDATE_LETTER
 
 router = APIRouter()
-Db = Annotated[Connection, Depends(get_conn)]
+# Commit the connection context before sending a successful response.
+Db = Annotated[Connection, Depends(get_conn, scope="function")]
 Mode = Literal["direct", "penpal"]
 Status = Literal["draft", "in_transit", "delivered"]
 
