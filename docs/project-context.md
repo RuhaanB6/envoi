@@ -1,3 +1,9 @@
+> **Stage 2 scope updated November 11, 2026:** the approved implementation uses
+> three tables (`users`, `penpalships`, `letters`), demo identity selection,
+> draft CRUD, and a filtered mailbox report. No auth, delivery service, invites,
+> tags, or memory permissions. See README.md and DATABASE.md for the current
+> implementation. The older product plan below is retained as historical context.
+
 # CS348 Project — Context, Domain, Schema, Plan
 
 _Last updated: 2026-09-17. Replaces `claude/stack-decision-and-stage1-status.md`, which is stale — delete that file._

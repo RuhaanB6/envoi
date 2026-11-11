@@ -1,38 +1,24 @@
 ---
 name: cs348-rubric
-description: What CS348 grades and which part of this app satisfies each criterion. Use when reviewing SQL, planning a task, or deciding whether something is demo-ready.
+description: Stage 2 acceptance criteria from the approved November 11 implementation request.
 ---
 
-# CS348 grading criteria
+# Stage 2 acceptance mapping
 
-The course grades the database work, not the product. Every item below must be
-demonstrable and defensible out loud — the TA asks the student, not the tool.
+This is the project's approved acceptance mapping, not a copy of an official rubric.
 
-**Requirement 1 — CRUD on a main table with supporting tables.**
-`letters` is the main table, with cascading writes to `letter_recipients` and
-`letter_tags`. Create, read, update, delete all reachable from the UI. Update
-and delete are allowed only while `status IN ('draft','scheduled')`, and that
-restriction is enforced in the stored procedure.
+1. Three related tables with primary/foreign keys, canonical pen-pal pairs,
+   mode/pair consistency, membership enforcement, and immutable non-drafts.
+2. UI demo-identity selection; letter list; draft create/edit/delete with
+   database-populated recipients and existing pen-palships.
+3. Mailbox report with correspondent/mode/status/date filters, counts, SQL average
+   word count, sent/received totals, and matching rows without double counting.
+4. Successful CRUD must visibly change the report; delete restores its baseline.
+5. Database queries populate identity, recipient, pair, and report filter options.
+6. Reversible migrations, five seeded users, active pairs, and at least fifteen letters.
+7. Real PostgreSQL tests plus mandatory running browser/API/database acceptance.
+8. Schema/SQL/run/test documentation, 5–15-minute demo, and accurate AI Usage
+   identifying tools, assisted tasks, verification, and student understanding.
 
-**Requirement 2 — a report with DB-populated filters and aggregates.**
-The mailbox summary. Filters are populated from the database, not hard-coded:
-pen pal (the user's own penpalships), mode, status, date range. Aggregates:
-letters sent and received, average word count, average reply time, response
-rate per pen pal, longest streak, days since the last letter, total distance
-travelled. Written as hand-written SQL, ideally one indexed query.
-
-**Stored procedures.** `send_letter(...)`, `deliver_due_letters()`,
-`accept_penpalship(...)`, `decide_view_request(...)`. They live in migrations
-and carry the business rules; the API calls them rather than reimplementing.
-
-**Transactions and concurrency.** Sending is atomic (letter + recipients + tags
-in one transaction). The delivery sweep uses `FOR UPDATE SKIP LOCKED`. Accepting
-an invite takes `FOR UPDATE` on the penpalship row so two accepts cannot race.
-
-**Indexing.** Each index exists to serve a named query — the report's filter
-shapes, the delivery sweep's `(status, deliver_at)` scan, session lookup by
-`token_hash`. Be able to show the `EXPLAIN` that justifies it.
-
-**Cloud bonus.** Neon (Postgres), Render (API), Vercel (frontend).
-
-When reviewing, weigh a finding by whether it would cost points or fail a demo.
+No authentication, scheduling, invites, animations, deployment, or memory workflow.
+Do not infer extra requirements from the superseded product plan.

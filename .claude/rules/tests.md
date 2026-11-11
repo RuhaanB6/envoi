@@ -14,9 +14,7 @@ paths: ["backend/tests/**"]
   order and twice in a row.
 - Fixtures create their own data explicitly. No shared seed file, no reliance
   on rows another test left behind.
-- One test per business rule the rubric cares about, named for the rule:
-  editing a delivered letter is rejected, the delivery sweep only moves letters
-  past `deliver_at`, two concurrent accepts of one invite yield one active
-  penpalship, a sender cannot read a delivered body without an approved view
-  request, the report's aggregates match hand-computed values on fixed data.
+- Test draft CRUD, ownership, invalid pen-pal associations, canonical pairs,
+  immutable statuses, SQL word count, report filters/aggregates, and DB options.
+- Use disposable PostgreSQL schemas so demo data is preserved.
 - Assert on behaviour and returned values, not on the SQL text.

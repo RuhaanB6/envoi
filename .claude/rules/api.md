@@ -21,8 +21,8 @@ paths: ["backend/app/**/*.py"]
 - A rule the database already enforces (a procedure raising on an edit after
   delivery) is caught and translated to a 4xx here — it is not re-implemented
   in Python.
-- Auth is a dependency (`current_user`) that reads the httpOnly session cookie,
-  hashes it and looks up `sessions`. Protected routes take it via `Depends`;
-  never parse the cookie inline in a handler.
+- Stage 2 selects `user_id` through a validated demo-user dependency. It is not
+  authentication. Scope writes to that sender; do not add sessions or passwords.
+- The connection dependency uses function scope to commit before HTTP success.
 - Settings are read from `app.config.settings`, never `os.environ` directly.
 - Ruff runs with `select = ["E", "F", "B"]` at line-length 100.

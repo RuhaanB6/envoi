@@ -19,12 +19,10 @@ paths: ["backend/migrations/**", "backend/app/db/**"]
   autocommit-off mode. Wrap multi-statement writes in `with conn.transaction():`
   so the whole unit commits or rolls back together. Do not open your own
   connections outside the pool.
-- Concurrency: `SELECT ... FOR UPDATE SKIP LOCKED` in the delivery sweep;
-  plain `FOR UPDATE` on a row two requests could accept or decide at once
-  (penpalship accept, view-request decide).
+- Lock pair rows while validating letter membership. Protect referenced pair
+  participants and non-draft letters with database triggers.
 - Every `CREATE INDEX` gets a one-line comment above it naming the query it
   serves. An index with no named query does not get created.
 - Stored procedures and functions live in migrations, never in Python strings.
-- Delivery and visibility rules are enforced in SQL: a sender cannot read a
-  delivered letter's body without an approved view request, and edit/delete is
-  rejected inside the procedure when the letter has left `draft`/`scheduled`.
+- Stage 2 edit/delete is draft-only, enforced in SQL triggers and guarded writes.
+  All API creates are drafts. No delivery or memory-permission implementation.

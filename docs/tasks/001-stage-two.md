@@ -1,6 +1,6 @@
 # 001 — Complete the Stage 2 demo
 
-Written November 11, 2026. Status: in progress.
+Written November 11, 2026. Status: done. Mandatory browser/API/database acceptance verified.
 
 ## Goal
 A local user can select a demo identity, create/edit/delete their own draft letters,
@@ -30,4 +30,5 @@ Authentication, delivery scheduling, animations, deployment, invites, memory per
 ## Verification
 Run migration apply/rollback/apply, pytest, Ruff, frontend build/lint, and browser CRUD
 with report/filter assertions. Push coherent commits to the existing public repository.
-AI disclosure must state actual assistance; exact course-policy wording is pending.
+AI disclosure identifies tools, assisted tasks, verification, and student responsibility,
+following the policy clarification supplied by the student.

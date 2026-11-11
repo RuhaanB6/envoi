@@ -73,3 +73,20 @@ simpler to reason about for a course demo.
 Not in Stage 2 or 3, in rough order for later: real email delivery for direct
 sends, the polished memory/return flow, pen-pal discovery and stranger matching,
 gifts attached to letters, physical print-and-mail.
+
+## 2026-11-11 — Finish Stage 2 with three tables
+
+The approved deadline scope is users, canonical penpalships, and letters with one
+sender and recipient. Local database-backed demo identity selection replaces
+authentication. API-created letters remain drafts; triggers reject edits/deletes
+of non-drafts and enforce pair membership. A single SQL report computes word
+counts dynamically and returns aggregates plus the matching rows. Sending,
+delivery scheduling, invitations, tags, memory permissions, animations, and cloud
+deployment are excluded. The November 11 user request overrides the older plan.
+
+## 2026-11-11 — Commit writes before sending success
+
+The mailbox connection dependency uses FastAPI function scope. Live HTTP testing
+showed that request-scope cleanup could otherwise commit after a client received
+success. Explicit transaction blocks plus connection-context cleanup now complete
+before the response is sent; a second connection verifies immediate persistence.

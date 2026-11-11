@@ -25,8 +25,9 @@ activated `.venv` — no `uv run`, no lockfile. Frontend lints with oxlint; ther
 - Raw parameterized SQL through psycopg3 (`%s` placeholders). No ORM, never an f-string or concatenation in a query.
 - Migrations are forward + rollback pairs, immutable once committed. Schema changes mean a new migration.
 - Tests run against a real Postgres. Never mock the database.
-- Graded business rules live in SQL — edit/delete only while `status IN ('draft','scheduled')`, the delivery
-  sweep, view-request visibility — enforced in stored procedures, not only in the API.
+- Stage 2 uses only users, penpalships, and letters. Demo-user selection replaces auth.
+- SQL triggers enforce pair membership and draft-only edit/delete. All API creates are drafts.
+- Do not add auth, sending/delivery jobs, invites, tags, or memory permissions for Stage 2.
 - The frontend holds no business logic.
 
 ## Read before editing
