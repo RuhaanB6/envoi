@@ -13,16 +13,20 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.db import pool
-from app.routers import health
+from app.db import create_pool
+from app.routers import health, mailbox
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    pool = create_pool()
+    app.state.pool = pool
     pool.open()
     pool.wait()
-    yield
-    pool.close()
+    try:
+        yield
+    finally:
+        pool.close()
 
 
 app = FastAPI(title="CS348 Project API", lifespan=lifespan)
@@ -36,3 +40,5 @@ app.add_middleware(
 )
 
 app.include_router(health.router, prefix="/api", tags=["health"])
+
+app.include_router(mailbox.router, prefix="/api", tags=["mailbox"])

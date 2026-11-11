@@ -14,23 +14,24 @@ them and the driver can use prepared statements.
 
 from collections.abc import Iterator
 
+from fastapi import Request
 from psycopg import Connection
 from psycopg_pool import ConnectionPool
 
 from app.config import settings
 
-# min_size=1 keeps at least one warm connection; max_size=10 is plenty for a
-# course project. open=False: the pool is opened explicitly during the
-# FastAPI lifespan instead of at import time.
-pool = ConnectionPool(
-    conninfo=settings.database_url,
-    min_size=1,
-    max_size=10,
-    open=False,
-)
+
+def create_pool() -> ConnectionPool:
+    """Create a fresh pool for each application lifespan (also safe in tests)."""
+    return ConnectionPool(
+        conninfo=settings.database_url,
+        min_size=1,
+        max_size=10,
+        open=False,
+    )
 
 
-def get_conn() -> Iterator[Connection]:
-    """FastAPI dependency that yields a pooled connection for one request."""
-    with pool.connection() as conn:
+def get_conn(request: Request) -> Iterator[Connection]:
+    """Yield a connection; the pool context commits or rolls back the request."""
+    with request.app.state.pool.connection() as conn:
         yield conn
