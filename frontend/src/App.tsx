@@ -1,127 +1,88 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { api, emptyFilters } from './api'
+import type { Filters, Letter, User } from './api'
+import { useMailbox } from './hooks/useMailbox'
+import { LetterForm } from './components/LetterForm'
 
-// Mirrors the JSON shape returned by GET /api/health in the backend.
-interface HealthResponse {
-  status: string
-  postgres_version: string
-  python_version: string
-  fastapi_version: string
+const label = (value: string) => value === 'penpal' ? 'Pen pal' : value === 'in_transit' ? 'In transit' : value.charAt(0).toUpperCase() + value.slice(1)
+const dateLabel = (value: string) => new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(new Date(value))
+
+function Mailbox({ user }: { user: User }) {
+  const [filters, setFilters] = useState<Filters>({ ...emptyFilters })
+  const [compose, setCompose] = useState<Letter | 'new' | null>(null)
+  const [reading, setReading] = useState<Letter | null>(null)
+  const [deleting, setDeleting] = useState<Letter | null>(null)
+  const [notice, setNotice] = useState('')
+  const { report, options, save, remove } = useMailbox(user.id, filters)
+  const changeFilter = (name: keyof Filters, value: string) => setFilters((old) => ({ ...old, [name]: value }))
+  const data = report.data
+  const activeFilters = Object.values(filters).some(Boolean)
+
+  return <>
+    <section className="flex flex-wrap items-end justify-between gap-6 pb-8 pt-10 sm:pt-14">
+      <div><p className="text-xs font-semibold uppercase tracking-[.22em] text-teal-800">{user.display_name}’s correspondence</p>
+        <h1 className="mt-3 font-serif text-4xl tracking-tight sm:text-5xl">Your mailbox, at a glance.</h1>
+        <p className="mt-4 max-w-xl leading-7 text-stone-600">A place for the words you send, and the ones that find you.</p></div>
+      <button className="primary" onClick={() => { save.reset(); setCompose('new') }} disabled={!options.data}>＋ Write a letter</button>
+    </section>
+    <div role="status" aria-live="polite" className="mb-4 min-h-5 text-sm text-teal-800">{notice}</div>
+    <section aria-label="Mailbox report" className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {[['Matching letters', data?.matching_count], ['Average word count', data?.average_word_count], ['Sent', data?.sent_count], ['Received', data?.received_count]].map(([name, value]) =>
+        <div key={name} className="rounded-xl border border-stone-200 bg-white/70 px-5 py-6"><p className="text-xs font-medium uppercase tracking-wider text-stone-500">{name}</p>
+          <p className="mt-3 font-serif text-4xl tabular-nums" data-testid={String(name).toLowerCase().replaceAll(' ', '-')}>{report.isError ? '—' : value ?? '…'}</p></div>)}
+    </section>
+    <section className="rounded-2xl border border-stone-200 bg-white/75">
+      <div className="border-b border-stone-200 p-5 sm:p-6">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><h2 className="font-serif text-2xl">Mailbox report</h2>
+          <button className="text-sm text-teal-800 underline underline-offset-4 disabled:text-stone-400" disabled={!activeFilters} onClick={() => setFilters({ ...emptyFilters })}>Clear filters</button></div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <label className="filter-label">Correspondent<select className="field mt-2" value={filters.correspondent_id} onChange={(e) => changeFilter('correspondent_id', e.target.value)}>
+            <option value="">All correspondents</option>{options.data?.correspondents.map((person) => <option key={person.id} value={person.id}>{person.display_name}</option>)}
+          </select></label>
+          <label className="filter-label">Mode<select className="field mt-2" value={filters.mode} onChange={(e) => changeFilter('mode', e.target.value)}>
+            <option value="">All modes</option>{filters.mode && options.data && !options.data.modes.includes(filters.mode) && <option value={filters.mode}>{label(filters.mode)}</option>}{options.data?.modes.map((mode) => <option key={mode} value={mode}>{label(mode)}</option>)}
+          </select></label>
+          <label className="filter-label">Status<select className="field mt-2" value={filters.status} onChange={(e) => changeFilter('status', e.target.value)}>
+            <option value="">All statuses</option>{filters.status && options.data && !options.data.statuses.includes(filters.status) && <option value={filters.status}>{label(filters.status)}</option>}{options.data?.statuses.map((status) => <option key={status} value={status}>{label(status)}</option>)}
+          </select></label>
+          <label className="filter-label">From (UTC)<input className="field mt-2" type="date" value={filters.date_from} onChange={(e) => changeFilter('date_from', e.target.value)} onBlur={(e) => changeFilter('date_from', e.target.value)} /></label>
+          <label className="filter-label">Through (UTC)<input className="field mt-2" type="date" value={filters.date_to} onChange={(e) => changeFilter('date_to', e.target.value)} onBlur={(e) => changeFilter('date_to', e.target.value)} /></label>
+        </div>
+        <p className="mt-4 text-xs leading-5 text-stone-500">Both sent and received letters. Dates filter when a letter was created; both boundary dates are included. Word counts are calculated in PostgreSQL.</p>
+      </div>
+      {(report.isError || options.isError) && <div role="alert" className="m-5 rounded-lg bg-rose-50 p-4 text-sm text-rose-800">{report.error?.message || options.error?.message}<button className="ml-3 underline" onClick={() => { void report.refetch(); void options.refetch() }}>Retry</button></div>}
+      {report.isPending && <p className="p-8 text-stone-500">Opening your mailbox…</p>}
+      {data && !report.isError && <>
+        <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm">
+          <thead className="bg-stone-50 text-xs uppercase tracking-wide text-stone-500"><tr><th className="p-5 font-medium">Letter</th><th className="p-5 font-medium">Correspondent</th><th className="p-5 font-medium">Mode / status</th><th className="p-5 font-medium">Created</th><th className="p-5 text-right font-medium">Words</th><th className="p-5 text-right font-medium">Actions</th></tr></thead>
+          <tbody>{data.letters.map((letter) => <tr key={letter.id} className="border-t border-stone-100 hover:bg-stone-50/70">
+            <td className="max-w-[280px] p-5"><button className="text-left font-semibold text-stone-800 underline-offset-4 hover:underline" onClick={() => setReading(letter)}>{letter.subject}</button><p className="mt-1 text-xs text-stone-500">{letter.is_sent ? 'Sent' : 'Received'} · #{letter.id}</p></td>
+            <td className="p-5">{letter.is_sent ? letter.recipient_name : letter.sender_name}</td>
+            <td className="p-5"><p>{label(letter.mode)}</p><span className={`mt-1 inline-block rounded-full px-2 py-1 text-[11px] ${letter.status === 'draft' ? 'bg-amber-50 text-amber-900' : 'bg-teal-50 text-teal-900'}`}>{label(letter.status)}</span></td>
+            <td className="whitespace-nowrap p-5 text-stone-500">{dateLabel(letter.created_at)}</td><td className="p-5 text-right tabular-nums">{letter.word_count}</td>
+            <td className="p-5 text-right">{letter.can_edit ? <div className="flex justify-end gap-3"><button className="text-teal-800 underline underline-offset-4" aria-label={`Edit ${letter.subject}`} onClick={() => { save.reset(); setCompose(letter) }}>Edit</button><button className="text-rose-700 underline underline-offset-4" aria-label={`Delete ${letter.subject}`} onClick={() => { remove.reset(); setDeleting(letter) }}>Delete</button></div> : <span className="text-xs text-stone-400">Read only</span>}</td>
+          </tr>)}</tbody>
+        </table></div>
+        {!data.letters.length && <div className="p-12 text-center"><p className="font-serif text-2xl">No letters here yet.</p><p className="mt-3 text-sm text-stone-500">{activeFilters ? 'Try a different filter or clear your selection.' : 'Start with a few words to someone you know.'}</p></div>}
+        <div className="flex flex-wrap justify-between gap-2 border-t border-stone-200 px-5 py-4 text-xs text-stone-500"><span>{data.matching_count} matching {data.matching_count === 1 ? 'letter' : 'letters'}{report.isFetching ? ' · Updating…' : ''}</span><span>Only your own drafts can be edited or deleted.</span></div>
+      </>}
+    </section>
+    {compose && options.data && <LetterForm key={compose === 'new' ? 'new' : compose.id} letter={compose === 'new' ? undefined : compose} options={options.data} pending={save.isPending} error={save.error?.message} onClose={() => setCompose(null)} onSave={(draft) => save.mutate({ draft, id: compose === 'new' ? undefined : compose.id }, { onSuccess: () => { setNotice(compose === 'new' ? 'Draft saved. Your report is up to date.' : 'Draft updated. Your report is up to date.'); setCompose(null) } })} />}
+    {deleting && <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/45 p-4"><section role="dialog" aria-modal="true" aria-labelledby="delete-heading" className="w-full max-w-md rounded-2xl bg-[#fffdf8] p-7 shadow-xl"><h2 id="delete-heading" className="font-serif text-2xl">Delete this draft?</h2><p className="mt-4 text-sm leading-6 text-stone-600">“{deleting.subject}” will be permanently removed.</p>{remove.error && <p role="alert" className="mt-3 text-sm text-rose-800">{remove.error.message}</p>}<div className="mt-6 flex justify-end gap-3"><button className="secondary" disabled={remove.isPending} onClick={() => setDeleting(null)}>Keep draft</button><button className="primary bg-rose-800 hover:bg-rose-900" disabled={remove.isPending} onClick={() => remove.mutate(deleting.id, { onSuccess: () => { setDeleting(null); setNotice('Draft deleted. Your report is up to date.') } })}>{remove.isPending ? 'Deleting…' : 'Delete draft'}</button></div></section></div>}
+    {reading && <div className="fixed inset-0 z-20 flex items-center justify-center bg-slate-950/45 p-4"><section role="dialog" aria-modal="true" aria-labelledby="read-heading" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-[#fffdf8] p-8 shadow-xl"><div className="flex items-start justify-between gap-4"><div><p className="text-xs uppercase tracking-widest text-teal-800">{reading.sender_name} → {reading.recipient_name}</p><h2 id="read-heading" className="mt-3 font-serif text-3xl">{reading.subject}</h2><p className="mt-3 text-xs text-stone-500">{dateLabel(reading.created_at)} · {label(reading.status)} · {reading.word_count} words</p></div><button aria-label="Close letter" onClick={() => setReading(null)} className="px-2 text-2xl">×</button></div><p className="mt-8 whitespace-pre-wrap break-words font-serif text-lg leading-8 text-stone-700">{reading.body}</p></section></div>}
+  </>
 }
 
-async function fetchHealth(): Promise<HealthResponse> {
-  const res = await fetch('/api/health')
-  if (!res.ok) {
-    throw new Error(`Health check failed: ${res.status}`)
-  }
-  return res.json()
+export default function App() {
+  const users = useQuery({ queryKey: ['users'], queryFn: api.users })
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const selectedUser = users.data?.find((user) => user.id === selectedId) ?? users.data?.find((user) => user.username === 'ruhaan') ?? users.data?.[0]
+  return <div className="min-h-screen bg-[#f6f5f0] text-stone-800">
+    <header className="border-b border-stone-200 bg-[#fffdf8]"><div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-8"><div className="flex items-center gap-4"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-900 font-serif text-2xl text-white" aria-hidden="true">e</span><div><p className="font-serif text-3xl tracking-tight">envoi<span className="text-teal-700">.</span></p><p className="text-[10px] uppercase tracking-[.18em] text-stone-500">Letters, done right</p></div></div>
+      <label className="flex items-center gap-3 text-xs font-medium text-stone-500">Demo identity<select aria-label="Demo identity" className="field min-w-40" value={selectedUser?.id ?? ''} onChange={(event) => setSelectedId(Number(event.target.value))} disabled={!users.data?.length}>{users.data?.map((user) => <option key={user.id} value={user.id}>{user.display_name}</option>)}</select></label></div></header>
+    <main className="mx-auto max-w-7xl px-5 pb-12 sm:px-8">{users.isPending && <p className="py-16 text-stone-600">Connecting to your mailbox…</p>}{users.error && <div role="alert" className="my-10 rounded-xl bg-rose-50 p-6 text-rose-800">Could not load demo users. {users.error.message}<button className="ml-3 underline" onClick={() => void users.refetch()}>Retry</button></div>}{users.data?.length === 0 && <p className="py-16">No demo users are available. Load the demo data to begin.</p>}{selectedUser && <Mailbox key={selectedUser.id} user={selectedUser} />}
+      <footer className="mt-8 flex flex-wrap justify-between gap-3 text-xs leading-6 text-stone-500"><span>Envoi · CS348 Stage 2</span><span>Local demo · Identity selection is not authentication · PostgreSQL-backed</span></footer>
+    </main>
+  </div>
 }
-
-// The backend returns Postgres' full banner ("PostgreSQL 17.6 (Debian ...) on
-// aarch64 ..."), which is too long for a table row. Pull out the leading
-// "PostgreSQL <version>" for display and keep the rest for the footer.
-function shortPostgresVersion(full: string): string {
-  return full.match(/^PostgreSQL [\d.]+/)?.[0] ?? full
-}
-
-function StatusPill({ state }: { state: 'loading' | 'ok' | 'error' }) {
-  const styles = {
-    loading: 'bg-amber-400/10 text-amber-300 ring-amber-400/30',
-    ok: 'bg-emerald-400/10 text-emerald-300 ring-emerald-400/30',
-    error: 'bg-rose-400/10 text-rose-300 ring-rose-400/30',
-  }[state]
-
-  const label = { loading: 'connecting', ok: 'connected', error: 'unreachable' }[state]
-
-  return (
-    <span
-      className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs
-                  font-medium ring-1 ring-inset ${styles}`}
-    >
-      <span className="relative flex h-2 w-2">
-        {state === 'ok' && (
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-        )}
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-current" />
-      </span>
-      {label}
-    </span>
-  )
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-6 border-b border-white/5 py-3 last:border-0">
-      <dt className="text-sm text-slate-400">{label}</dt>
-      <dd className="font-mono text-sm text-slate-100">{value}</dd>
-    </div>
-  )
-}
-
-function App() {
-  const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['health'],
-    queryFn: fetchHealth,
-  })
-
-  const state = isLoading ? 'loading' : isError ? 'error' : 'ok'
-
-  return (
-    <div className="min-h-screen bg-slate-950 bg-[radial-gradient(ellipse_at_top,#1e293b,#020617)] px-6 py-16">
-      <main className="mx-auto w-full max-w-xl">
-        <header className="text-center">
-          <h1 className="bg-gradient-to-r from-sky-300 via-indigo-300 to-fuchsia-300 bg-clip-text text-5xl font-bold tracking-tight text-transparent sm:text-6xl">
-            Hello, World!
-          </h1>
-          <p className="mt-4 text-slate-400">
-            CS348 Project &mdash; Stage 1. React and Vite talking to FastAPI,
-            talking to Postgres.
-          </p>
-        </header>
-
-        <section className="mt-10 rounded-2xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-200">Stack health</h2>
-            <StatusPill state={state} />
-          </div>
-
-          <div className="mt-4">
-            {isLoading && (
-              <p className="py-6 text-center text-sm text-slate-400">
-                Checking the backend&hellip;
-              </p>
-            )}
-
-            {isError && (
-              <div className="rounded-lg bg-rose-500/10 p-4 text-sm text-rose-300">
-                <p className="font-medium">Could not reach /api/health</p>
-                <p className="mt-1 text-rose-300/70">{(error as Error).message}</p>
-                <p className="mt-3 text-rose-300/70">
-                  Is the backend running on port 8000?
-                </p>
-              </div>
-            )}
-
-            {data && (
-              <>
-                <dl>
-                  <Row label="Postgres" value={shortPostgresVersion(data.postgres_version)} />
-                  <Row label="Python" value={data.python_version} />
-                  <Row label="FastAPI" value={data.fastapi_version} />
-                </dl>
-                <p className="mt-4 border-t border-white/5 pt-4 font-mono text-[11px] leading-relaxed text-slate-500">
-                  {data.postgres_version}
-                </p>
-              </>
-            )}
-          </div>
-        </section>
-
-        <p className="mt-6 text-center text-xs text-slate-500">
-          Every value above came from a live <code className="font-mono text-slate-400">SELECT version()</code> query.
-        </p>
-      </main>
-    </div>
-  )
-}
-
-export default App

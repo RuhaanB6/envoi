@@ -1,1 +1,17 @@
 @import "tailwindcss";
+
+@layer base {
+  body { margin: 0; }
+  button, select { cursor: pointer; }
+  button:disabled, select:disabled { cursor: default; opacity: .55; }
+  button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible {
+    outline: 2px solid #0f766e; outline-offset: 3px;
+  }
+}
+
+@layer components {
+  .field { @apply block w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-sm font-normal text-stone-800; }
+  .primary { @apply rounded-lg bg-teal-900 px-5 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-teal-800 disabled:opacity-50; }
+  .secondary { @apply rounded-lg border border-stone-300 px-4 py-3 text-sm font-medium hover:bg-stone-100; }
+  .filter-label { @apply block text-xs font-medium text-stone-600; }
+}
